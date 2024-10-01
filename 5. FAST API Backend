@@ -1,0 +1,23 @@
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
+import tensorflow as tf
+import numpy as np
+import cv2
+
+app = FastAPI()
+
+# Load the pre-trained model
+model = tf.keras.models.load_model('best_model.h5')
+
+@app.post("/predict")
+async def predict_mri(file: UploadFile = File(...)):
+    contents = await file.read()
+    np_img = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(np_img, cv2.IMREAD_GRAYSCALE)
+    img = cv2.resize(img, (256, 256))
+    img = np.expand_dims(img, axis=(0, -1)) / 255.0
+    
+    prediction = model.predict(img)
+    result = (prediction > 0.5).astype(np.uint8)
+    
+    return JSONResponse(content={"prediction": result.tolist()})
